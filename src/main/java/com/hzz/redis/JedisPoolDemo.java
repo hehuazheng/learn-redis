@@ -4,6 +4,11 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
+/**
+ * 使用JedisPool时，使用完成后需要释放，调用pool.destroy();<br />
+ * 参照： http://www.tagspert.com/2011/08/tomcat-redis/ <br />
+ * 在tomcat中时使用 ServletContextListener 来实现
+ */
 public class JedisPoolDemo {
 	private static transient JedisPool INSTANCE = null;
 
@@ -18,33 +23,34 @@ public class JedisPoolDemo {
 		return INSTANCE;
 	}
 
-	public static String get(String key) {
+	public static Jedis getJedis() {
 		Jedis jedis = null;
 		try {
 			jedis = getPool().getResource();
 			System.out.println(jedis.toString());
-			return jedis.get(key);
+			return jedis;
 		} catch (JedisConnectionException e) {
 			if (jedis != null) {
 				INSTANCE.returnBrokenResource(jedis);
 				jedis = null;
 			}
 			throw e;
-		} finally {
-			if (jedis != null) {
-				INSTANCE.returnResource(jedis);
-			}
 		}
 	}
 
 	public static void main(String[] args) {
-		for (int i = 0; i < 10; i++) {
-			final int idx = i;
-			new Thread() {
-				public void run() {
-					System.out.println(idx + ": " + get("foo"));
-				};
-			}.start();
+		Jedis jedis = getJedis();
+		String key = "test-key-hzz";
+		boolean exist = jedis.exists(key);
+		System.out.println(exist);
+		// 设置成功返回1
+		long res = jedis.setnx(key, "hzz");
+		System.out.println("res: " + res);
+		// 设置成功返回0
+		res = jedis.setnx(key, "hzz2");
+		System.out.println("res: " + res);
+		if (jedis != null) {
+			INSTANCE.returnResource(jedis);
 		}
 	}
 
